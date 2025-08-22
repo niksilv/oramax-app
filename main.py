@@ -1,6 +1,7 @@
-﻿from fastapi import FastAPI, UploadFile, File, HTTPException
+﻿from typing import List
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, conlist
+from pydantic import BaseModel, Field
 import numpy as np
 import importlib
 
@@ -19,16 +20,15 @@ def root():
 
 @app.get("/healthz")
 def healthz():
-    # Καθόλου ML εδώ – πάντα πράσινο αν ο server τρέχει
+    # Καθόλου ML εδώ – πράσινο αν ο server τρέχει
     return {"ok": True, "version": "0.1.0"}
 
 class PredictBody(BaseModel):
-    lightcurve: conlist(float, min_items=5)
+    lightcurve: List[float] = Field(min_length=5)
 
 def _infer_module():
     # Lazy import για να μην μπλοκάρει το startup
-    m = importlib.import_module("inference")
-    return m
+    return importlib.import_module("inference")
 
 @app.post("/predict")
 def predict(body: PredictBody):
