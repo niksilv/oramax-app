@@ -1,0 +1,12 @@
+[
+  "std",
+  "mad",
+  "max_drop",
+  "acf1",
+  "tls_SDE",
+  "tls_period",
+  "tls_duration",
+  "tls_depth",
+  "tls_snr",
+  "tls_transit_count"
+]
