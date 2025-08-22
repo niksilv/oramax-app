@@ -1,50 +1,54 @@
-﻿from typing import List
+﻿# προσθέσεις στην κορυφή αν δεν υπάρχουν ήδη:
+import re
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-import numpy as np
-import importlib
+from pydantic import BaseModel
+from typing import List
 
-app = FastAPI(title="Orama X API", version="0.1.0")
+app = FastAPI(title="Orama X API")
 
-origins = ["https://www.oramax.space", "https://oramax.space", "http://localhost:3000"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins, allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
-)
+class PredictResponse(BaseModel):
+    planet_prob: float
 
-@app.get("/")
-def root():
-    return {"status": "ok", "app": "Orama X", "message": "Hello from app.oramax.space!"}
+class LightCurveRequest(BaseModel):
+    # δέξου οποιαδήποτε λίστα floats και έλεγξε το μήκος εσύ (όχι με validator)
+    lightcurve: List[float]
 
-@app.get("/healthz")
-def healthz():
-    # Καθόλου ML εδώ – πράσινο αν ο server τρέχει
-    return {"ok": True, "version": "0.1.0"}
+# -------------------------------
+# /predict (JSON)
+# -------------------------------
+@app.post("/predict", response_model=PredictResponse)
+async def predict_json(req: LightCurveRequest):
+    values = [float(x) for x in req.lightcurve]
+    if len(values) < 3:
+        # δώσε ξεκάθαρο μήνυμα στον χρήστη
+        raise HTTPException(status_code=400, detail="Need at least 3 numbers.")
+    prob, _feats = predict_from_array(values)  # κράτα τη δική σου predict_from_array
+    return {"planet_prob": float(prob)}
 
-class PredictBody(BaseModel):
-    lightcurve: List[float] = Field(min_length=5)
-
-def _infer_module():
-    # Lazy import για να μην μπλοκάρει το startup
-    return importlib.import_module("inference")
-
-@app.post("/predict")
-def predict(body: PredictBody):
-    try:
-        arr = np.asarray(body.lightcurve, dtype=float)
-        m = _infer_module()
-        return m.predict_from_array(arr)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/predict-file")
+# -------------------------------
+# /predict-file (multipart/form-data)
+# -------------------------------
+@app.post("/predict-file", response_model=PredictResponse)
 async def predict_file(file: UploadFile = File(...)):
-    try:
-        content = (await file.read()).decode("utf-8-sig")
-        m = _infer_module()
-        arr = np.asarray(m.read_flux_text(content), dtype=float)
-        return m.predict_from_array(arr)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    # Δέξου UTF-8 με BOM, αγνόησε περίεργους χαρακτήρες
+    raw = (await file.read()).decode("utf-8-sig", errors="ignore").strip()
+    # Σπάσε σε κόμματα ή/και κενά (π.χ. "1, 0.99 1.01")
+    tokens = re.split(r"[,\s]+", raw)
+    values: List[float] = []
+    for t in tokens:
+        if not t:
+            continue
+        try:
+            values.append(float(t))
+        except ValueError:
+            # αγνόησε ό,τι δεν είναι αριθμός
+            pass
+
+    if len(values) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Couldn't parse enough numbers from file (need ≥ 3, comma/space-separated).",
+        )
+
+    prob, _feats = predict_from_array(values)
+    return {"planet_prob": float(prob)}
