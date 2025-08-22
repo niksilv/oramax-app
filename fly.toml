@@ -12,13 +12,14 @@ primary_region = "fra"
   min_machines_running = 1
   processes = ["app"]
 
-  # Health check προς το /healthz
+  # Health check προς το /healthz (γρήγορο και «στενό» για άμεσο fail/auto-restart)
   [[http_service.checks]]
     method = "GET"
     path = "/healthz"
-    interval = "15s"
-    timeout = "3s"
-    grace_period = "30s"
+    interval = "10s"
+    timeout = "2s"
+    grace_period = "20s"
+    protocol = "http"
 
 [[vm]]
   memory = "1gb"
