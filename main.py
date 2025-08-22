@@ -97,3 +97,14 @@ async def predict_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Could not parse file. Use comma or whitespace separated floats.")
     prob, feats = predict_from_array(values)
     return PredictResponse(planet_prob=prob, features=feats)
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+    # Τρέξε τον server ακριβώς στη 0.0.0.0:8080 (ή PORT του Fly αν οριστεί)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8080")),
+        log_level="info",
+    )
